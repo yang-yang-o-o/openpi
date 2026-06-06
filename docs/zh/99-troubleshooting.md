@@ -36,10 +36,13 @@
 
 | 问题 | 解决方案 |
 |------|---------|
-| 训练 OOM（JAX） | `export XLA_PYTHON_CLIENT_MEM_FRACTION=0.9`；改用 `_low_mem_finetune` config；禁用 EMA |
+| 训练 OOM（JAX） | `export XLA_PYTHON_CLIENT_MEM_FRACTION=0.9`；改用 `_low_mem`/`_low_mem_finetune` config；禁用 EMA |
+| 用 `pi0_aloha_sim` 报 "48 GiB > 22 GiB" OOM | 该 config 是全量微调 + EMA，4090 装不下。改用 `pi0_aloha_sim_low_mem`（LoRA 版） |
 | 训练 OOM（PyTorch） | PyTorch 无 LoRA/FSDP，4090 基本只能跑 `_low_mem_finetune` |
 | `Missing norm stats` | 训练前先 `uv run scripts/compute_norm_stats.py --config-name <cfg>` |
 | 训练 loss 发散 | 检查 `norm_stats.json` 的 `q01/q99/std`，某些维度若极小会导致归一化后值爆炸，可手动调整 |
+| 训练启动崩 `api_key not configured (no-tty)` | wandb 没登录 + 后台跑没 tty。先 `wandb login <key>`；或加 `WANDB_MODE=disabled` |
+| `wandb login` 报 `API key must be 40 characters long, yours was 86` | 粘错内容了，可能带了 URL / 邮箱 / PAT。重去 https://wandb.ai/authorize 只复制纯 40 位 key |
 | Dataset download fails | HF 数据：`huggingface-cli login`；网络：用 `HF_ENDPOINT` 国内镜像 |
 | Action dimensions mismatch | 检查 policy class 的 `Inputs/Outputs` 维度是否对应你的机器人 |
 

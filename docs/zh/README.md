@@ -13,7 +13,8 @@
 | 03 | [推理快速上手](./03-inference-quickstart.md) | 启 server + 跑 simple_client 验证 |
 | 04 | [模型与环境选择](./04-models-and-envs.md) | 4 个 EnvMode、完整 config 列表、怎么选 |
 | 05 | [PyTorch vs JAX](./05-pytorch-vs-jax.md) | 两套实现差异，4090 用户应该选哪个 |
-| 06 | [微调流程](./06-finetuning.md) | LIBERO 微调示例 + 显存优化 |
+| 06 | [微调流程](./06-finetuning.md) | 自己数据微调 + 显存优化（通用） |
+| 07 | [**4090 微调全流程实战**](./07-4090-finetune-walkthrough.md) | **ALOHA Sim · 2h smoke + 过夜 20k，含评估脚本** |
 | 99 | [常见问题](./99-troubleshooting.md) | 全量踩坑速查表 |
 
 ---
@@ -23,6 +24,7 @@
 > **我想……**
 
 - **跑通推理验证** → 01 → 02 → 03
+- **4090 上 2 小时跑通微调** → 01 → 02 → **07** ⭐
 - **跑标准 benchmark（LIBERO）** → 01 → 02 → 04（选 LIBERO） → 06
 - **自己数据微调** → 01 → 02 → 06
 - **接真机（DROID/ALOHA）** → 01 → 02 → 03 → 04（看对应 env）
