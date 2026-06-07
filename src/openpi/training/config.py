@@ -949,6 +949,9 @@ _CONFIGS = [
             action_expert_variant="gemma_300m_lora",
         ).get_freeze_filter(),
         ema_decay=None,
+        # Keep every saved checkpoint (save_interval=1000) for evaluation curve.
+        save_interval=1000,
+        keep_period=1000,
     ),
     #
     # Debugging configs.

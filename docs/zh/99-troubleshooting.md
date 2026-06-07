@@ -38,6 +38,10 @@
 |------|---------|
 | 训练 OOM（JAX） | `export XLA_PYTHON_CLIENT_MEM_FRACTION=0.9`；改用 `_low_mem`/`_low_mem_finetune` config；禁用 EMA |
 | 用 `pi0_aloha_sim` 报 "48 GiB > 22 GiB" OOM | 该 config 是全量微调 + EMA，4090 装不下。改用 `pi0_aloha_sim_low_mem`（LoRA 版） |
+| checkpoint 只保留最后一份 | 源码硬编码 `max_to_keep=1`，永久保留靠 `keep_period`（默认 5000）。若 num_train_steps < keep_period，所有中间 checkpoint 会被删。把 config 里加 `keep_period=1000` |
+| `aloha_sim/main.py` 报 `Unrecognized options: --num-episodes` | 该脚本**没有** `--num-episodes` 参数，一次只跑 1 episode。多次评估用 shell `for seed in ...; do main.py --args.seed $seed; done` |
+| `aloha_sim/main.py` 报 `Unrecognized options: --host --seed` | tyro 把 `args: Args` 当成子命名空间，所有参数要加 `--args.` 前缀：`--args.host 127.0.0.1 --args.seed 0` |
+| `aloha_sim/main.py` 不打成功率 | 它只存视频。要看 reward 需自己改 `env.py` 暴露 `_episode_reward` 并在 main.py 中 print |
 | 训练 OOM（PyTorch） | PyTorch 无 LoRA/FSDP，4090 基本只能跑 `_low_mem_finetune` |
 | `Missing norm stats` | 训练前先 `uv run scripts/compute_norm_stats.py --config-name <cfg>` |
 | 训练 loss 发散 | 检查 `norm_stats.json` 的 `q01/q99/std`，某些维度若极小会导致归一化后值爆炸，可手动调整 |
@@ -59,6 +63,10 @@
 | 实例销毁后本地盘数据丢失 | 重要 checkpoint 拷回 `~/work` 或下载到本地 |
 | 训练巨慢 | 检查数据是否在 `~/work`（云同步盘很慢）。数据放 `/home/featurize/data` 或其他本地目录 |
 | MUJOCO_GL 报错 | 无显示器服务器用 `export MUJOCO_GL=egl`；安装 `libegl1-mesa-dev libgles2-mesa-dev` |
+| `Cannot initialize a headless EGL display` / `libEGL warning: failed to open /dev/dri/...` | Featurize 没 DRI 权限 + 没 NVIDIA EGL vendor。改用 OSMesa：`sudo apt install libosmesa6-dev libosmesa6 libgl1-mesa-glx`，然后 `MUJOCO_GL=osmesa` |
+| `Failed to load library ('libOSMesa.so.0'): No such file` | Ubuntu 22.04 装的是 `libOSMesa.so.8`，PyOpenGL 硬编码找 `.so.0`。建软链：`sudo ln -sf /usr/lib/x86_64-linux-gnu/libOSMesa.so.8 /usr/lib/x86_64-linux-gnu/libOSMesa.so.0 && sudo ldconfig` |
+| `libstdc++.so.6: version 'GLIBCXX_3.4.30' not found` | conda 自带 libstdc++ 太老（只到 3.4.14）。`LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6 <你的命令>` 强制用系统版 |
+| `AttributeError: 'NoneType' object has no attribute 'glGetError'` | OSMesa 加载链断了，往上看真实报错（通常是上面两条之一） |
 
 ---
 

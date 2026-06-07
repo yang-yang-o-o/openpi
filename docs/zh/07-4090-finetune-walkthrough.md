@@ -113,6 +113,7 @@ uv run python -c "import jax; print('jax devices:', jax.devices())"
 cd /home/featurize/work/openpi
 sudo apt-get update
 sudo apt-get install -y ffmpeg
+curl -LsSf https://astral.sh/uv/install.sh | sh
 uv run scripts/compute_norm_stats.py --config-name pi0_aloha_sim_low_mem
 ```
 
@@ -162,34 +163,85 @@ grep -E "step=|loss=" train_smoke3k.log | tail
 
 ### 4) 拿到中间 checkpoint 跑仿真评估
 
-默认 `save_interval=1000`，3000 步会存 3 份 checkpoint：`checkpoints/pi0_aloha_sim_low_mem/smoke3k/{1000,2000,3000}/`。
+⚠️ **必须先在 config 里加 `keep_period=1000`**（已加入 `pi0_aloha_sim_low_mem`），否则只保留最后一份 checkpoint。
+源码硬编码 `max_to_keep=1`，永久保留靠 `keep_period`；默认 5000，对 3000 步训练等于全删。
 
-**跑完后逐个评估**（看到学习曲线，比单点更有意义）：
+正常情况会有：`checkpoints/pi0_aloha_sim_low_mem/smoke3k/{1000,2000,3000}/`。
+
+**跑评估的实际命令**（aloha_sim/main.py 一次只跑 1 个 episode，要 shell 循环换 seed）：
 
 ```bash
-for step in 1000 2000 3000; do
-  echo "=== Evaluating step $step ==="
+# 起 server（如已在跑跳过）
+nohup uv run scripts/serve_policy.py policy:checkpoint \
+  --policy.config=pi0_aloha_sim_low_mem \
+  --policy.dir=checkpoints/pi0_aloha_sim_low_mem/smoke3k/3000 \
+  > server_3000.log 2>&1 &
+sleep 90
 
-  # 终端 1：起 server（后台）
-  nohup uv run scripts/serve_policy.py policy:checkpoint \
-    --policy.config=pi0_aloha_sim_low_mem \
-    --policy.dir=checkpoints/pi0_aloha_sim_low_mem/smoke3k/$step \
-    > server_$step.log 2>&1 &
-  SERVER_PID=$!
-  sleep 90   # 等模型加载完成（首次会下 paligemma tokenizer）
-
-  # 终端 2：MuJoCo 仿真跑评估
+# 跑 10 次评估（不同 seed），视频落地 data/aloha_sim/eval_videos/
+mkdir -p data/aloha_sim/eval_videos
+for seed in $(seq 0 9); do
+  echo "=== seed $seed ==="
   MUJOCO_GL=egl uv run examples/aloha_sim/main.py \
-    --host 127.0.0.1 \
-    --num-episodes=20 \
-    2>&1 | tee eval_$step.log
-
-  kill $SERVER_PID
-  sleep 5
+    --args.host 127.0.0.1 --args.seed $seed \
+    --args.out-dir data/aloha_sim/eval_videos 2>&1 | tee -a eval.log
 done
 ```
 
-> ⚠️ 仿真依赖 `MUJOCO_GL=egl`（无显示器服务器）。EGL 报错见 `[examples/aloha_sim/README.md](../../examples/aloha_sim/README.md)`。
+**踩坑提醒**：
+
+- ⚠️ `aloha_sim/main.py` 用 `tyro.cli(main)` 把 `args: Args` 当成子命名空间，**所有参数必须加 `--args.` 前缀**（`--args.host` / `--args.seed` / `--args.out-dir`），不是 `--host` / `--seed`
+- `--args.host 0.0.0.0`（默认）在 Featurize 连不通，**必须显式 `--args.host 127.0.0.1`**
+- `aloha_sim/main.py` **没有** `--num-episodes` 参数，一次只跑 1 个 episode，多次评估用 shell 循环换 `--args.seed`
+- 它**也不输出成功率**，只存视频；要看成败**人眼数视频**，或改 `env.py` 暴露 `_episode_reward` 再 print
+
+### 渲染后端选择
+
+Featurize 容器通常 **没有 `/dev/dri/*` 权限 + 没装 NVIDIA EGL vendor 文件**，`MUJOCO_GL=egl` 会报 `Cannot initialize a headless EGL display`。
+
+**先检查**：
+
+```bash
+ls /usr/share/glvnd/egl_vendor.d/
+```
+
+- 看到 `10_nvidia.json` → 可用 EGL，前面加 `export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json` 后用 `MUJOCO_GL=egl`
+- 只有 `50_mesa.json` → 走下面 OSMesa（Featurize 大多数实例属于这种）
+
+**OSMesa（推荐，CPU 软渲染）**：
+
+完整三步搞定（每步都可能踩一个坑，按顺序做）：
+
+```bash
+# 1. 装 OSMesa
+sudo apt-get update
+sudo apt-get install -y libosmesa6-dev libosmesa6 libgl1-mesa-glx
+
+# 2. 建版本号软链：Ubuntu 22.04 装的是 libOSMesa.so.8，PyOpenGL 硬编码找 .so.0
+sudo ln -sf /usr/lib/x86_64-linux-gnu/libOSMesa.so.8 \
+            /usr/lib/x86_64-linux-gnu/libOSMesa.so.0
+sudo ldconfig
+
+# 3. 启动评估时 LD_PRELOAD 系统 libstdc++
+#    （conda 自带的 libstdc++ 太老，没 GLIBCXX_3.4.30，加载 libLLVM-15.so.1 会失败）
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6 \
+  MUJOCO_GL=osmesa \
+  uv run examples/aloha_sim/main.py \
+    --args.host 127.0.0.1 --args.seed 0
+```
+
+**永久生效**：
+
+```bash
+cat >> ~/.zshrc << 'EOF'
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
+export MUJOCO_GL=osmesa
+EOF
+source ~/.zshrc
+# 之后跑评估只需：uv run examples/aloha_sim/main.py --args.host 127.0.0.1 --args.seed 0
+```
+
+⚠️ OSMesa 比 GPU 渲染慢 3–10 倍，单 episode 30–90 秒，10 个 seed 评估 5–15 分钟。**不影响训练**，只影响仿真画面生成。
 
 ---
 
@@ -290,17 +342,27 @@ kill $(cat full20k.pid) 2>/dev/null
 
 ## 7.7 实测数据反馈
 
-跑完后欢迎补一张实测表（替换我现在的估计）：
+跑完后欢迎补充实测表（替换我现在的估计）：
 
+| 步数    | 训练耗时        | 评估成功率（10 seed） | 行为定性描述 |
+| ----- | ----------- | ---------------- | -------- |
+| 3000  | ~40 分钟（实测） | **0/10**（实测）    | **全部主动尝试抓取**（task 结构正确）；夹爪一致性地落在距方块一段距离的桌面，**精度不足** |
+| 5000  | —           | —                |          |
+| 10000 | —           | —                |          |
+| 20000 | ~4 小时（估）   | —                |          |
+| 80000 | ~16 小时（估）  | —                |          |
 
-| 步数    | 实测耗时 | 实测成功率（20 ep） | 备注  |
-| ----- | ---- | ------------ | --- |
-| 1000  | —    | —            |     |
-| 2000  | —    | —            |     |
-| 3000  | —    | —            |     |
-| 5000  | —    | —            |     |
-| 10000 | —    | —            |     |
-| 20000 | —    | —            |     |
+### 质性结论（3000 步 / bs=4 / 10 seed）
+
+**强一致性**：10/10 都"伸手 + 张爪 + 另一臂等待"，0/10 抓到。失败模式高度一致（不是随机乱动），属于**典型欠拟合但方向正确**。
+
+| 学会 | 缺什么 |
+|------|--------|
+| ✅ 任务目标（伸向方块） | ⚠️ 末端 3D 定位精度 |
+| ✅ 动作语义（夹爪张开时机） | |
+| ✅ 双臂分工（等待方应等待） | |
+
+→ 增加训练步数能直接见效。Phase 2（20k）保守预计 40–60%。
 
 
 ---
