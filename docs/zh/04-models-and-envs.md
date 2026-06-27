@@ -126,10 +126,11 @@ MUJOCO_GL=egl uv run scripts/serve_policy.py --env ALOHA_SIM
 
 - **官方 benchmark**，π₀.₅-LIBERO 是 SOTA
 - 需要 `git submodule update --init --recursive` 拉 `third_party/libero`
-- 推荐用 Docker（依赖较老：Python 3.8、CUDA 11.3）
+- 需要**单独 Python 3.8 venv**（`examples/libero/.venv`），与主 OpenPI 环境分离；Featurize 上用 OSMesa 无头渲染，不必 Docker
+- Featurize 已验证：`libero_spatial` Smoke（10 task × 1 trial）约 **9 分钟**，可产出 `data/libero/videos/*.mp4`
 - 适合**对比论文结果**、**评测微调效果**
 
-详情：[`examples/libero/README.md`](../../examples/libero/README.md)
+详情：[`examples/libero/README.md`](../../examples/libero/README.md) · **Featurize 逐步跑法** → [08 · LIBERO 推理实战](./08-libero-inference-walkthrough.md)
 
 ---
 
@@ -139,7 +140,7 @@ MUJOCO_GL=egl uv run scripts/serve_policy.py --env ALOHA_SIM
 |------|-----|
 | 第一次跑通验证安装 | **DROID**（checkpoint 公开效果好，无需仿真依赖） |
 | 想看仿真画面（双臂） | `ALOHA_SIM` |
-| 跑标准 benchmark / 复现论文 | `LIBERO` |
+| 跑标准 benchmark / 复现论文 | **`LIBERO`** → [08](./08-libero-inference-walkthrough.md) |
 | 真 Franka / DROID 机器人 | `DROID` |
 | 真 ALOHA 机器人 | `ALOHA` |
 

@@ -15,6 +15,12 @@
 | `Failed to hardlink files; falling back to full copy` | 警告，不影响。可 `export UV_LINK_MODE=copy` 消音 |
 | CUDA 报错 | 不要装系统级 CUDA，让 uv 管理；必要时卸载系统 CUDA |
 | GitHub 拉取（含 lerobot/dlimp）很慢 | 配置 `git config --global url."https://ghproxy.com/https://github.com/".insteadOf "https://github.com/"` |
+| LIBERO venv：`Invalid requirement: '#'` | `examples/libero/requirements.txt` 含缩进注释行；用 `grep -E '^[a-zA-Z0-9]'` 过滤，见 [08 · LIBERO 推理实战](./08-libero-inference-walkthrough.md) |
+| LIBERO venv：`wheel not supported on this platform` | 用 `python -m pip` 不要用裸 `pip`（Featurize conda 3.11 与 venv 3.8 混用） |
+| LIBERO venv：pip 超时 | `unset all_proxy ALL_PROXY` |
+| LIBERO venv：`torch==1.11.0+cu113` 找不到 | 国内 PyPI 无 `+cu113`；client 用 CPU wheel 即可，见 [08 · LIBERO 推理实战](./08-libero-inference-walkthrough.md) |
+| LIBERO venv：`egl_probe` 编译失败 | `sudo apt-get install -y cmake build-essential` |
+| LIBERO venv：`No module named 'future'` 等 | 补装 `third_party/libero/requirements.txt`；`robosuite` 单独 pin `==1.4.1` |
 
 ---
 
@@ -28,6 +34,7 @@
 | Server 日志 `gsutil not found, falling back to gcsfs` | 正常，用 Python 客户端下 GCS |
 | Checkpoint 下载慢 | 设置 `OPENPI_DATA_HOME` 到本地盘（不要放 `~/work`） |
 | `connection refused` 连不上 server | 确认 server 真的在跑：`ss -tlnp \| grep 8000` 应能看到 python 进程监听 |
+| LIBERO client `infer()` 一直卡住 | server 勿 **Ctrl+Z** 挂起；首次 infer 等 JAX 编译；见 [08 §8.4](./08-libero-inference-walkthrough.md) |
 | HF 数据集下载失败 | `huggingface-cli login`；或 `export HF_ENDPOINT=https://hf-mirror.com` |
 
 ---
@@ -63,7 +70,8 @@
 | 实例销毁后本地盘数据丢失 | 重要 checkpoint 拷回 `~/work` 或下载到本地 |
 | 训练巨慢 | 检查数据是否在 `~/work`（云同步盘很慢）。数据放 `/home/featurize/data` 或其他本地目录 |
 | MUJOCO_GL 报错 | 无显示器服务器用 `export MUJOCO_GL=egl`；安装 `libegl1-mesa-dev libgles2-mesa-dev` |
-| `Cannot initialize a headless EGL display` / `libEGL warning: failed to open /dev/dri/...` | Featurize 没 DRI 权限 + 没 NVIDIA EGL vendor。改用 OSMesa：`sudo apt install libosmesa6-dev libosmesa6 libgl1-mesa-glx`，然后 `MUJOCO_GL=osmesa` |
+| `Cannot initialize a headless EGL display` / `libEGL warning: failed to open /dev/dri/...` | Featurize 没 DRI 权限 + 没 NVIDIA EGL vendor。改用 OSMesa：先 `sudo apt-get update`，再 `sudo apt install libosmesa6-dev libosmesa6 libgl1-mesa-glx`，然后 `MUJOCO_GL=osmesa` |
+| apt 装 `libosmesa6` 报 404 | 包索引过期，先 `sudo apt-get update` 再装 |
 | `Failed to load library ('libOSMesa.so.0'): No such file` | Ubuntu 22.04 装的是 `libOSMesa.so.8`，PyOpenGL 硬编码找 `.so.0`。建软链：`sudo ln -sf /usr/lib/x86_64-linux-gnu/libOSMesa.so.8 /usr/lib/x86_64-linux-gnu/libOSMesa.so.0 && sudo ldconfig` |
 | `libstdc++.so.6: version 'GLIBCXX_3.4.30' not found` | conda 自带 libstdc++ 太老（只到 3.4.14）。`LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6 <你的命令>` 强制用系统版 |
 | `AttributeError: 'NoneType' object has no attribute 'glGetError'` | OSMesa 加载链断了，往上看真实报错（通常是上面两条之一） |

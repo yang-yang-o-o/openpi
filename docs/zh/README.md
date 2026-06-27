@@ -15,6 +15,7 @@
 | 05 | [PyTorch vs JAX](./05-pytorch-vs-jax.md) | 两套实现差异，4090 用户应该选哪个 |
 | 06 | [微调流程](./06-finetuning.md) | 自己数据微调 + 显存优化（通用） |
 | 07 | [**4090 微调全流程实战**](./07-4090-finetune-walkthrough.md) | **ALOHA Sim · 2h smoke + 过夜 20k，含评估脚本** |
+| 08 | [**LIBERO 推理实战**](./08-libero-inference-walkthrough.md) | **π₀.₅-LIBERO benchmark · 仿真闭环 + 对论文 + 录像**（Featurize Smoke 已跑通） |
 | 99 | [常见问题](./99-troubleshooting.md) | 全量踩坑速查表 |
 
 ---
@@ -24,8 +25,8 @@
 > **我想……**
 
 - **跑通推理验证** → 01 → 02 → 03
+- **跑标准 benchmark（LIBERO）** → 01 → 02 → **08** ⭐
 - **4090 上 2 小时跑通微调** → 01 → 02 → **07** ⭐
-- **跑标准 benchmark（LIBERO）** → 01 → 02 → 04（选 LIBERO） → 06
 - **自己数据微调** → 01 → 02 → 06
 - **接真机（DROID/ALOHA）** → 01 → 02 → 03 → 04（看对应 env）
 - **遇到错误** → 99
